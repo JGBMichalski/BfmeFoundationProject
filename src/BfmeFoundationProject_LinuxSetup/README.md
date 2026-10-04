@@ -55,7 +55,7 @@ Without the extensions the app detects the problem, `doctor` fails, and every st
 
 ### Repository and updates
 
-Tagged releases (`linux-v*`) publish a Flatpak repository to GitHub Pages, so `flatpak update` finds new versions. The repository address is `https://<owner>.github.io/<repo>` unless the repository variable `FLATPAK_REPO_BASE_URL` is set. One-time setup: **Settings > Pages > Source: GitHub Actions**.
+Tagged releases (`linux-v*`) publish a Flatpak repository to GitHub Pages, so `flatpak update` finds new versions. The repository address is `https://<owner>.github.io/<repo>` unless the repository variable `FLATPAK_REPO_BASE_URL` is set. One-time setup: **Settings > Pages > Source: GitHub Actions**, then allow tags to deploy: **Settings > Environments > github-pages > Deployment branches and tags > Add rule > Tag `linux-v*`** (the environment allows only the default branch at first, so a tagged run is rejected with "Tag ... is not allowed to deploy to github-pages").
 
 ```
 curl -fLO https://<owner>.github.io/<repo>/install-flatpak.sh && bash install-flatpak.sh

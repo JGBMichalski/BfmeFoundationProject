@@ -126,7 +126,7 @@ jobs:
           flatpak install --user bfme-foundation BfmeFoundationProject.AllInOneLauncher.Linux</pre>
           <p>Update with <code>flatpak update</code>.</p>
           EOF
-          ls -R site | head -20
+          find site -maxdepth 2 | sort
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
