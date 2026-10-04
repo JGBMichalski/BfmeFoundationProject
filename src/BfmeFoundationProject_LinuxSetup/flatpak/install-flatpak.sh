@@ -41,7 +41,7 @@ command -v flatpak >/dev/null 2>&1 || die "Flatpak is not installed. Install it 
 [ -z "$BUNDLE" ] || [ -f "$BUNDLE" ] || die "Bundle '$BUNDLE' was not found."
 
 say "Step 1: make sure Flathub is available for the runtime and the 32-bit extensions"
-if ! flatpak remotes --columns=name | grep -qx flathub; then
+if ! flatpak remotes --user --columns=name | grep -qx flathub; then
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 fi
 
