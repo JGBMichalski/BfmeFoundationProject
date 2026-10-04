@@ -53,4 +53,15 @@ flatpak/install-flatpak.sh --repo <repo URL or path>       # or: --bundle file.f
 
 Without the extensions the app detects the problem, `doctor` fails, and every start command exits with the command to run.
 
+### Repository and updates
+
+Tagged releases (`linux-v*`) publish a Flatpak repository to GitHub Pages, so `flatpak update` finds new versions. The repository address is `https://<owner>.github.io/<repo>` unless the repository variable `FLATPAK_REPO_BASE_URL` is set. One-time setup: **Settings > Pages > Source: GitHub Actions**.
+
+```
+curl -fLO https://<owner>.github.io/<repo>/install-flatpak.sh && bash install-flatpak.sh
+flatpak update        # later, to get new versions
+```
+
+The repository is not signed yet, so Flatpak adds it with signature checking off.
+
 Data lives in `~/.var/app/BfmeFoundationProject.AllInOneLauncher.Linux/data/bfme-foundation`.

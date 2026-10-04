@@ -4,7 +4,7 @@
 # Runs as your user. No sudo.
 #
 # Usage: install-flatpak.sh [--repo URL_OR_PATH | --bundle FILE.flatpak]
-#   --repo URL    Flatpak repository to install from (default: $BFME_FLATPAK_REPO)
+#   --repo URL    Flatpak repository to install from (default: the project's repository)
 #   --bundle FILE Install from a single .flatpak file instead
 
 set -euo pipefail
@@ -12,6 +12,8 @@ set -euo pipefail
 readonly APP_ID="BfmeFoundationProject.AllInOneLauncher.Linux"
 readonly RUNTIME_VERSION="25.08"
 readonly REMOTE_NAME="bfme-foundation"
+# CI replaces the placeholder with the published repository address in the copy it publishes.
+readonly DEFAULT_REPO="@BFME_DEFAULT_REPO@"
 REPO="${BFME_FLATPAK_REPO:-}"
 BUNDLE=""
 
@@ -26,6 +28,13 @@ while [ $# -gt 0 ]; do
     *) die "Unknown option '$1'. Run with --help." ;;
   esac
 done
+
+if [ -z "$REPO" ] && [ -z "$BUNDLE" ]; then
+  case "$DEFAULT_REPO" in
+    "@"*) ;;                       # still the placeholder: no default repository
+    *)    REPO="$DEFAULT_REPO" ;;
+  esac
+fi
 
 command -v flatpak >/dev/null 2>&1 || die "Flatpak is not installed. Install it first: https://flatpak.org/setup/"
 [ -n "$REPO" ] || [ -n "$BUNDLE" ] || die "Give --repo URL or --bundle FILE (or set BFME_FLATPAK_REPO)."

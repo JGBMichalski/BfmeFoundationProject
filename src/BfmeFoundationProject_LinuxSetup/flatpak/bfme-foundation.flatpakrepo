@@ -1,0 +1,6 @@
+[Flatpak Repo]
+Title=BFME Foundation Project
+Url=@BFME_REPO_URL@
+Homepage=https://bfmeladder.com
+Comment=Run the BFME All-in-One Launcher and Online Arena on Linux
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo

@@ -58,9 +58,13 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Collect release files
+        env:
+          FLATPAK_REPO_BASE_URL: ${{ vars.FLATPAK_REPO_BASE_URL }}
         run: |
+          BASE_URL="${FLATPAK_REPO_BASE_URL:-https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}}"
           cp "$SETUP_DIR/bfme-linux-setup.sh" dist/
-          cp "$SETUP_DIR/flatpak/install-flatpak.sh" dist/
+          sed "s|@BFME_DEFAULT_REPO@|$BASE_URL/repo|" "$SETUP_DIR/flatpak/install-flatpak.sh" > dist/install-flatpak.sh
+          chmod +x dist/install-flatpak.sh
           ls -l dist
           cd dist && sha256sum -- * > SHA256SUMS
       - name: Publish the release
@@ -68,3 +72,65 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+  # Publishes a Flatpak repository to GitHub Pages so `flatpak update` can find new versions.
+  # Needs Pages enabled with "GitHub Actions" as the source (Settings > Pages).
+  # The repository address is https://<owner>.github.io/<repo>, unless the repository variable
+  # FLATPAK_REPO_BASE_URL is set (for example when a custom domain is used).
+  publish-repo:
+    if: startsWith(github.ref, 'refs/tags/linux-v')
+    needs: flatpak
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Install the Flatpak tools
+        run: sudo apt-get update && sudo apt-get install -y flatpak ostree
+      - name: Build the repository and the site
+        env:
+          FLATPAK_REPO_BASE_URL: ${{ vars.FLATPAK_REPO_BASE_URL }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${FLATPAK_REPO_BASE_URL:-https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}}"
+          mkdir -p site
+          # Only the newest version is kept: users pull what they are missing.
+          ostree init --repo=site/repo --mode=archive-z2
+          flatpak build-import-bundle site/repo dist/bfme-foundation-linux.flatpak
+          flatpak build-update-repo --generate-static-deltas --prune site/repo
+          sed "s|@BFME_REPO_URL@|$BASE_URL/repo|" "$SETUP_DIR/flatpak/bfme-foundation.flatpakrepo" > site/bfme-foundation.flatpakrepo
+          sed "s|@BFME_DEFAULT_REPO@|$BASE_URL/repo|" "$SETUP_DIR/flatpak/install-flatpak.sh" > site/install-flatpak.sh
+          chmod +x site/install-flatpak.sh
+          cat > site/index.html <<EOF
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>BFME Foundation Project - Linux</title>
+          <h1>BFME Foundation Project - Linux Flatpak repository</h1>
+          <p>Install (the helper also installs the 32-bit Flatpak extensions the app needs):</p>
+          <pre>curl -fLO $BASE_URL/install-flatpak.sh
+          bash install-flatpak.sh</pre>
+          <p>Or add the repository yourself and install the app. You must then also install the 32-bit Flatpak extensions, or the app will tell you they are missing:</p>
+          <pre>flatpak remote-add --user --if-not-exists bfme-foundation $BASE_URL/bfme-foundation.flatpakrepo
+          flatpak install --user bfme-foundation BfmeFoundationProject.AllInOneLauncher.Linux</pre>
+          <p>Update with <code>flatpak update</code>.</p>
+          EOF
+          ls -R site | head -20
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
