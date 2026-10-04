@@ -1,0 +1,70 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [master, main]
+    tags: ['linux-v*']
+    paths:
+      - 'src/BfmeFoundationProject_LinuxSetup/**'
+      - '.github/workflows/build-linux.yml'
+  pull_request:
+    paths:
+      - 'src/BfmeFoundationProject_LinuxSetup/**'
+      - '.github/workflows/build-linux.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SETUP_DIR: src/BfmeFoundationProject_LinuxSetup
+  APP_ID: BfmeFoundationProject.AllInOneLauncher.Linux
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x "$SETUP_DIR/bfme-linux-setup.sh" "$SETUP_DIR/flatpak/install-flatpak.sh"
+
+  flatpak:
+    needs: shellcheck
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: bfme-foundation-linux.flatpak
+          manifest-path: src/BfmeFoundationProject_LinuxSetup/flatpak/BfmeFoundationProject.AllInOneLauncher.Linux.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: true
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/linux-v')
+    needs: flatpak
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      # No artifact name is given on purpose: the Flatpak action chooses its own, so take them all.
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Collect release files
+        run: |
+          cp "$SETUP_DIR/bfme-linux-setup.sh" dist/
+          cp "$SETUP_DIR/flatpak/install-flatpak.sh" dist/
+          ls -l dist
+          cd dist && sha256sum -- * > SHA256SUMS
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
