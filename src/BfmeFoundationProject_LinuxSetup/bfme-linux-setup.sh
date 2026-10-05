@@ -25,7 +25,7 @@
 #
 # Settings go in <data dir>/config.env (plain shell variables) or the environment:
 #   BFME_RUNNER        proton (default) or wine
-#   BFME_PROTONPATH    Proton to use (default UMU-Latest; GE-Proton or a path also work)
+#   BFME_PROTONPATH    Proton to use (default pinned UMU-Proton; UMU-Latest, GE-Proton or a path also work)
 #   BFME_ARENA_BRANCH  Arena update branch (default main)
 #   BFME_NVIDIA        auto (default), 1 or 0. Use the NVIDIA card on a two-card computer.
 #   BFME_EXTRA_ENV     Extra environment, e.g. "DXVK_HUD=fps"
@@ -36,6 +36,12 @@
 set -euo pipefail
 
 readonly SCRIPT_VERSION="0.1.0"
+# Pinned on purpose: "UMU-Latest" moves, which re-downloads Proton and can change game behaviour
+# (and so risk "Out of Sync" against Windows players). Raise this together with a release.
+# umu can only download "latest" builds by name, so this exact build is fetched and verified here.
+readonly DEFAULT_PROTONPATH="UMU-Proton-10.0-4"
+readonly PROTON_URL="https://github.com/Open-Wine-Components/umu-proton/releases/download/${DEFAULT_PROTONPATH}/${DEFAULT_PROTONPATH}.tar.gz"
+readonly PROTON_SHA256="62e99e029a18fa313e6fa63d42390918101730a940e3491c54d9d58cab887c69"
 readonly UMU_VERSION="1.4.4"
 readonly UMU_URL="https://github.com/Open-Wine-Components/umu-launcher/releases/download/${UMU_VERSION}/umu-launcher-${UMU_VERSION}-zipapp.tar"
 readonly UMU_SHA256="eb590691841f7fad3fc3ad8fd5db4ccb87849fe7948e62b28ece7a4ee48cc851"
@@ -66,7 +72,7 @@ if [ "$IN_FLATPAK" = "1" ] && [ "$RUNNER" != "proton" ]; then
   printf 'ERROR: The Flatpak only supports the proton runner (there is no system Wine in the sandbox).\n' >&2
   exit 1
 fi
-PROTONPATH_VALUE="${BFME_PROTONPATH:-UMU-Latest}"
+PROTONPATH_VALUE="${BFME_PROTONPATH:-$DEFAULT_PROTONPATH}"
 ARENA_BRANCH="${BFME_ARENA_BRANCH:-main}"
 NVIDIA_MODE="${BFME_NVIDIA:-auto}"
 UMU_RUN="${BFME_UMU_RUN:-}"
@@ -359,6 +365,23 @@ use_nvidia() {
   [ "$(printf '%s\n' "$cards" | grep -c .)" -gt 1 ] && printf '%s\n' "$cards" | grep -qi nvidia
 }
 
+# Download the pinned Proton build. Other values of BFME_PROTONPATH are passed to umu unchanged.
+ensure_proton() {
+  [ "$PROTONPATH_VALUE" = "$DEFAULT_PROTONPATH" ] || return 0
+  local dir="$BASE/proton/$DEFAULT_PROTONPATH"
+  if [ ! -f "$dir/toolmanifest.vdf" ]; then
+    local tarball="$DOWNLOADS/$DEFAULT_PROTONPATH.tar.gz"
+    download "$PROTON_URL" "$tarball"
+    verify_sha256 "$tarball" "$PROTON_SHA256"
+    rm -rf "$dir"
+    mkdir -p "$BASE/proton"
+    tar -xzf "$tarball" -C "$BASE/proton"
+    [ -f "$dir/toolmanifest.vdf" ] || die "Proton was not found after extracting $tarball."
+    rm -f "$tarball"
+  fi
+  PROTONPATH_VALUE="$dir"
+}
+
 # Run a program with the shared prefix.
 # $1: "inprefix" (use an existing prefix) or "create" (first start, may create it); the rest is the command.
 run_in_runner() {
@@ -420,6 +443,7 @@ ensure_runner() {
   fi
   if [ "$RUNNER" = "proton" ]; then
     ensure_umu
+    ensure_proton
   else
     command -v wine >/dev/null 2>&1 || die "Wine is not installed. Run 'doctor' for what to install."
     ensure_winetricks
@@ -490,7 +514,20 @@ EOF
   : >"$marker"
 }
 
+# Only one setup at a time: a second click on the shortcut during the long first start
+# would otherwise run two Proton setups in the same prefix.
+acquire_setup_lock() {
+  command -v flock >/dev/null 2>&1 || return 0
+  mkdir -p "$BASE"
+  exec 9>"$BASE/.setup.lock"
+  if ! flock -n 9; then
+    notify "Setup is already running. Please wait, the first start takes a few minutes."
+    die "Another setup is already running. Wait for it to finish."
+  fi
+}
+
 ensure_prefix() {
+  prefix_ready || acquire_setup_lock
   ensure_runner
   prefix_ready || create_prefix
   if [ "$RUNNER" = "wine" ] && [ -f "$PREFIX/.bfme-wine-version" ]; then

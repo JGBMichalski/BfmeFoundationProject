@@ -3,9 +3,10 @@
 # Flatpak does not install those extensions for apps that are not on Flathub, so this does it for you.
 # Runs as your user. No sudo.
 #
-# Usage: install-flatpak.sh [--repo URL_OR_PATH | --bundle FILE.flatpak]
+# Usage: install-flatpak.sh [--repo URL_OR_PATH | --bundle FILE.flatpak] [--no-setup]
 #   --repo URL    Flatpak repository to install from (default: the project's repository)
 #   --bundle FILE Install from a single .flatpak file instead
+#   --no-setup    Do not run the first-time setup (Proton download) after installing
 
 set -euo pipefail
 
@@ -16,6 +17,7 @@ readonly REMOTE_NAME="bfme-foundation"
 readonly DEFAULT_REPO="@BFME_DEFAULT_REPO@"
 REPO="${BFME_FLATPAK_REPO:-}"
 BUNDLE=""
+SETUP=1
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 say() { printf '%s\n' "$*"; }
@@ -24,6 +26,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --repo)   REPO="${2:-}"; shift 2 ;;
     --bundle) BUNDLE="${2:-}"; shift 2 ;;
+    --no-setup) SETUP=0; shift ;;
     -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "Unknown option '$1'. Run with --help." ;;
   esac
@@ -77,6 +80,15 @@ else
   flatpak install --user -y --noninteractive "$REMOTE_NAME" "$APP_ID"
 fi
 
+if [ "$SETUP" = "1" ]; then
+  say ""
+  say "Step 4: first-time setup (downloads Proton and the launcher, a few minutes; progress is shown here)"
+  flatpak run --user --command=bfme-linux-setup "$APP_ID" install \
+    || say "Setup did not finish. It will run again on first start, or run: flatpak run --command=bfme-linux-setup $APP_ID doctor"
+fi
+
 say ""
 say "Done. Open 'BFME All-in-One Launcher' or 'BFME Online Arena' from your application menu."
-say "The first start downloads Proton and sets up the environment, which takes a few minutes."
+if [ "$SETUP" = "0" ]; then
+  say "The first start downloads Proton and sets up the environment, which takes a few minutes. Nothing is shown while it runs."
+fi

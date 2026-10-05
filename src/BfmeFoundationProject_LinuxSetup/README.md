@@ -25,7 +25,7 @@ Other commands: `launcher`, `arena`, `game bfme1|bfme2|rotwk`, `shortcuts`, `sta
 
 ## Settings
 
-`<data dir>/config.env` or the environment: `BFME_RUNNER` (proton|wine), `BFME_PROTONPATH`, `BFME_ARENA_BRANCH`, `BFME_NVIDIA` (auto|1|0), `BFME_EXTRA_ENV`, `BFME_UMU_RUN`, `BFME_HOME`.
+`<data dir>/config.env` or the environment: `BFME_RUNNER` (proton|wine), `BFME_PROTONPATH` (default: a pinned UMU-Proton), `BFME_ARENA_BRANCH`, `BFME_NVIDIA` (auto|1|0), `BFME_EXTRA_ENV`, `BFME_UMU_RUN`, `BFME_HOME`.
 
 ## Notes
 
@@ -48,7 +48,7 @@ flatpak-builder --user --install --install-deps-from=flathub --force-clean build
 The 32-bit extensions are required, and Flatpak does **not** install them for apps outside Flathub (not with `flatpak-builder`, not from a self-hosted repo, not with a `.flatpakref`). Use the helper, which also picks the 32-bit NVIDIA driver that matches your card:
 
 ```
-flatpak/install-flatpak.sh --repo <repo URL or path>       # or: --bundle file.flatpak
+flatpak/install-flatpak.sh --repo <repo URL or path>       # or: --bundle file.flatpak   (add --no-setup to skip the first-time Proton download)
 ```
 
 Without the extensions the app detects the problem, `doctor` fails, and every start command exits with the command to run.
