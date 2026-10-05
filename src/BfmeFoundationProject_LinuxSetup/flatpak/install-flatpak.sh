@@ -60,7 +60,14 @@ fi
 flatpak install --user -y --noninteractive flathub "${ext[@]}"
 
 say "Step 3: install the app"
-if [ -n "$BUNDLE" ]; then
+if [ -z "$BUNDLE" ] && flatpak info --user "$APP_ID" >/dev/null 2>&1; then
+  say "The app is already installed. Updating it instead (this also re-checks the extensions above)."
+  case "$REPO" in
+    /*) REPO="file://$REPO" ;;
+  esac
+  flatpak remote-add --user --if-not-exists --no-gpg-verify "$REMOTE_NAME" "$REPO"
+  flatpak update --user -y --noninteractive "$APP_ID"
+elif [ -n "$BUNDLE" ]; then
   flatpak install --user -y --noninteractive --bundle "$BUNDLE"
 else
   case "$REPO" in

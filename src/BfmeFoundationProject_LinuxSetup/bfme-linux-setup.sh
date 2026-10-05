@@ -266,12 +266,25 @@ notify() {
 FLATPAK_RUNTIME_VERSION="25.08"
 flatpak_32bit_missing() {
   # Succeeds (returns 0) when something is missing. Markers are the mounted extension files.
-  [ ! -e /usr/lib/i386-linux-gnu/ld-linux.so.2 ] || [ ! -d /usr/lib/i386-linux-gnu/GL/default ]
+  [ ! -e /usr/lib/i386-linux-gnu/ld-linux.so.2 ] && return 0
+  local d name found_gl32=0
+  # Every GL driver mounted for 64-bit (for example nvidia-550-107-02) needs the same 32-bit one.
+  # A host driver update changes this name and flatpak update does not fetch the 32-bit match.
+  for d in /usr/lib/x86_64-linux-gnu/GL/nvidia-*; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    [ -d "/usr/lib/i386-linux-gnu/GL/$name" ] || return 0
+    found_gl32=1
+  done
+  [ "$found_gl32" = "1" ] || [ -d /usr/lib/i386-linux-gnu/GL/default ] || return 0
+  return 1
 }
 flatpak_32bit_message() {
   cat <<EOF
 The 32-bit parts of the Flatpak runtime are not installed, so the games and apps cannot start.
-Run this once in a terminal, then start the app again:
+Easiest fix: run the installer again (it also picks the 32-bit driver that matches your graphics card):
+  curl -fLO <repository address>/install-flatpak.sh && bash install-flatpak.sh
+Or by hand, then start the app again:
   flatpak install flathub org.freedesktop.Platform.Compat.i386//${FLATPAK_RUNTIME_VERSION} org.freedesktop.Platform.GL32.default//${FLATPAK_RUNTIME_VERSION}
 With an NVIDIA graphics card also install the matching 32-bit driver. Find its name with:
   flatpak list | grep nvidia
